@@ -43,7 +43,7 @@ test {
 }
 //The maximum number of test processes to start in parallel.
 tasks.withType(Test) {
-    maxParallelForks = 20
+    maxParallelForks = 30
 }
 
 

@@ -1,33 +1,51 @@
 package com.assessment.webcalc;
 
-import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.container.AsyncResponse;
+import jakarta.ws.rs.container.Suspended;
 
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Path("/")
 public class WebCalcController {
 
-    private final CalcService calcService = new CalcService();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(22);
+
+    private static final SuperStaticCalc calc = SuperStaticCalc.getInstance();
 
     @POST
     @Produces("text/plain")
-    public String calculate(String val) {
+    public void calculate(String val, @Suspended AsyncResponse ar) {
 
-        var incoming = calcService.parseIncomingString(val);
-        var isEndOfRound = false;
-        var processed = calcService.processIncomingValue(incoming);
-
-        while (!isEndOfRound) {
-            isEndOfRound = calcService.isEndOfRound(incoming.key());
-
-        }
-        var result = calcService.getSumm(processed.key());
-        calcService.reset(incoming);
-        return result + " " + processed.key();
+        executor.execute(() -> {
+          var res = execute(val);
+          ar.resume(res);
+        });
     }
 
+    private String execute(String value){
+        var val  = value.trim().toLowerCase();
+        try {
+            var numb = Integer.parseInt(val);
+            WebCalcController.calc.sum(numb);
+        } catch (NumberFormatException e) {
+            var strs = val.trim().split(" ");
+            if (strs.length == 2 && strs[0].equals("end")) {
+                WebCalcController.calc.setIsEnd();
+                WebCalcController.calc.setRoundName(strs[1]);
+            }else {
+                return "Wrong command";
+            }
+        }
+
+        var isEnd = false;
+        while (!isEnd) {
+            isEnd = WebCalcController.calc.isIsEnd();
+        }
+
+        return WebCalcController.calc.getCount() + " " + WebCalcController.calc.getRoundName();
+    }
 }
